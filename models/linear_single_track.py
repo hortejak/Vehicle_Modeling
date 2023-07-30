@@ -31,9 +31,7 @@ class LinearSingleTrackModel():
         # x .... states     [x,y,psi,v,beta,r] (pos x, pos y, heading, sideslip angle, yaw rate)
         # u .... inputs     [df,dr] (front and rear steering angles)
 
-        df = u[0]
-        dr = u[1]
-
+        df,dr = u[0:2]
         v,beta,r = x[3:6]
         
         if v != 0:
@@ -50,13 +48,10 @@ class LinearSingleTrackModel():
 
         else:
 
-            dv = 0
             dbeta = 0
             dr = 0
 
         dv = 0
-
-
         psi,v,beta = x[2:5]
 
         dx = v*np.cos(psi+beta)
@@ -72,35 +67,23 @@ if __name__ == "__main__":
 
     S = LinearSingleTrackModel()
     test_data = np.loadtxt("data/single_track_data.csv",dtype=float,delimiter=",")
-    
+
+    start_time = 1500    
     max_time = 20000
-    start_time = 1500
+    
     t = test_data[start_time:max_time,0]
 
-    x_ode = np.zeros(len(t))
-    y_ode = np.zeros(len(t))
-    psi_ode = np.zeros(len(t))
-    v_ode = np.zeros(len(t))
-    beta_ode = np.zeros(len(t))
-    r_ode = np.zeros(len(t))
-
+    x_ode = np.zeros((6,len(t)))
     x_prev = np.array([0,0,0,22.6,0,0])
 
-    v_ode[0] = x_prev[3]
+    x_ode[:,0] = x_prev
 
     for i in range(len(t)-1):
         v = spi.solve_ivp(S.f,[t[i],t[i+1]],x_prev,args=(test_data[start_time+i,1:],))
-        x_ode[i+1] = v.y[0][-1]
-        y_ode[i+1] = v.y[1][-1]
-        psi_ode[i+1] = v.y[2][-1]
-        v_ode[i+1] = v.y[3][-1]
-        beta_ode[i+1] = v.y[4][-1]
-        r_ode[i+1] = v.y[5][-1]
+        x_ode[:,i+1] = v.y[:,-1]
+        x_prev = v.y[:,-1]
 
-        for j in range(6):
-            x_prev[j] = v.y[j][-1]
-            
-    plt.plot(x_ode,y_ode,'-')
+    plt.plot(x_ode[0,:],x_ode[1,:],'-')
     plt.axis('equal')
 
     plt.show()

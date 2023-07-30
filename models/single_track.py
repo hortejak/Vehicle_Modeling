@@ -49,9 +49,9 @@ class SingleTrackModel():
 
     def rigid_body_dynamics(self,Fx,Fy,Mz,x):
 
-        v = x[3]
-        beta = x[4]
-        r = x[5]
+        # represents the vehicle chassis
+
+        v,beta,r = x[3:6]
 
         D = np.zeros(3)     # dbeta, dv, dr
 
@@ -72,8 +72,11 @@ class SingleTrackModel():
     
     def steering_angle_projection(self,Fxf,Fyf,Fxr,Fyr,u):
 
-        df = u[0]
-        dr = u[1]
+        # computes longitudal and lateral forces acting on the rigin body as well as the angular momentum
+
+        # returns F = [Fx,Fy.Mz]
+
+        df,dr = u[0:2]
 
         F_pre = np.array([[Fxf],[Fyf],[Fxr],[Fyr]])
         cf,cr,sf,sr = np.cos(df), np.cos(dr), np.sin(df), np.sin(dr)
@@ -84,6 +87,10 @@ class SingleTrackModel():
     
 
     def tire_models(self,af,ar,lambdaf,lambdar):
+
+        # calculates tire forces from slip variables
+
+        # two line model, can be improved by simplified Pacejka
 
         F = np.zeros(4)
 
@@ -103,12 +110,10 @@ class SingleTrackModel():
     
     def wheel_kinematics(self,x,u):
 
-        df = u[0]
-        dr = u[1]
+        # calculates sideslip angles and wheel speeds
 
-        v = x[3]
-        beta = x[4]
-        r = x[5]
+        df,dr = u[0:2]
+        v,beta,r = x[3:6]
 
         V = np.zeros(4)
 
@@ -124,7 +129,7 @@ class SingleTrackModel():
         Vf = np.transpose(Af @ Vf_pre)[0]
         Vr = np.transpose(Ar @ Vr_pre)[0]
 
-        V[0] = -np.arctan2(Vf[1],np.abs(Vf[0]))
+        V[0] = -np.arctan2(Vf[1],np.abs(Vf[0]))     # alphaF --> angle between the wheel's F and v
         V[1] = -np.arctan2(Vr[1],np.abs(Vr[0]))
         V[2] = Vf[0]
         V[3] = Vr[0]
@@ -132,6 +137,8 @@ class SingleTrackModel():
         return V
     
     def wheel_dynamics(self,x,u,Fxf,Fxr):
+
+        # calculates wheel rotational dynamics
 
         tdf,tbf,tdr,tbr = u[2:6]
         wf,wr = x[6:8]
@@ -143,6 +150,8 @@ class SingleTrackModel():
     
     def slip_ratios(self,vxf,vxr,x):
 
+        # computes how each wheel spins
+
         wf,wr = x[6:8]
         lambdaf = (wf*self.rad-vxf)/np.max((np.abs(wf*self.rad),np.abs(vxf)))
         lambdar = (wr*self.rad-vxr)/np.max((np.abs(wr*self.rad),np.abs(vxr)))
@@ -153,41 +162,23 @@ if __name__ == "__main__":
 
     S = SingleTrackModel()
     test_data = np.loadtxt("data/single_track_data.csv",dtype=float,delimiter=",")
-    
+
+    start_time = 1500    
     max_time = 20000
-    start_time = 1500
+    
     t = test_data[start_time:max_time,0]
 
-    x_ode = np.zeros(len(t))
-    y_ode = np.zeros(len(t))
-    psi_ode = np.zeros(len(t))
-    v_ode = np.zeros(len(t))
-    beta_ode = np.zeros(len(t))
-    r_ode = np.zeros(len(t))
-    wf_ode = np.zeros(len(t))
-    wr_ode = np.zeros(len(t))
-
+    x_ode = np.zeros((8,len(t)))
     x_prev = np.array([0,0,0,1,0,0,1/S.rad,1/S.rad])
 
-    v_ode[0] = 1
-    wf_ode[0] = 1/S.rad
-    wr_ode[0] = 1/S.rad
+    x_ode[:,0] = x_prev
 
     for i in range(len(t)-1):
         v = spi.solve_ivp(S.f,[t[i],t[i+1]],x_prev,args=(test_data[start_time+i,1:],))
-        x_ode[i+1] = v.y[0][-1]
-        y_ode[i+1] = v.y[1][-1]
-        psi_ode[i+1] = v.y[2][-1]
-        v_ode[i+1] = v.y[3][-1]
-        beta_ode[i+1] = v.y[4][-1]
-        r_ode[i+1] = v.y[5][-1]
-        wf_ode[i+1] = v.y[6][-1]
-        wr_ode[i+1] = v.y[7][-1]
+        x_ode[:,i+1] = v.y[:,-1]
+        x_prev = v.y[:,-1]
 
-        for j in range(8):
-            x_prev[j] = v.y[j][-1]
-
-    plt.plot(x_ode,y_ode,'-')
+    plt.plot(x_ode[0,:],x_ode[1,:],'-')
     plt.axis('equal')
 
     plt.show()
