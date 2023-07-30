@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 class KinematicModel():
 
     def __init__(self,lf=0.971,lr=1.566) -> None:
-        self.lf = lf
-        self.lr = lr
+        self.lf = lf        # distance between the CG and the front axis
+        self.lr = lr        # distance between the CG and the rear axis
 
     def sideslip_angle(self,df,dr):
 
@@ -24,12 +24,11 @@ class KinematicModel():
         # x .... states     [x,y,psi]
         # u .... inputs     [vf,vr,df,dr]
 
-        df = u[2]
-        dr = u[3]
+        vf,vr,df,dr = u[0:4]
         psi = x[2]
 
         beta = self.sideslip_angle(df,dr)
-        v = self.velocity(u[0],u[1],df,dr,beta)
+        v = self.velocity(vf,vr,df,dr,beta)
 
         dx = v*np.cos(psi+beta)
         dy = v*np.sin(psi+beta) 
@@ -41,29 +40,25 @@ class KinematicModel():
 
 if __name__=="__main__":
 
+    # Example of usage
+
     K = KinematicModel()
     test_data = np.loadtxt("data/kinematic_data.csv",dtype=float,delimiter=",")
 
+    start_time = 0
     max_time = 20000
 
-    t = test_data[0:max_time,0]
+    t = test_data[start_time:max_time,0]
 
-    x_ode = np.zeros(len(t))
-    y_ode = np.zeros(len(t))
-    psi_ode = np.zeros(len(t))
-
-    x_prev = [0,0,0]
+    x_ode = np.zeros((3,len(t)))
+    x_prev = np.zeros(3)
 
     for i in range(len(t)-1):
         v = spi.solve_ivp(K.f,[t[i],t[i+1]],x_prev,args=(test_data[i,1:],))
-        x_ode[i+1] = v.y[0][-1]
-        y_ode[i+1] = v.y[1][-1]
-        psi_ode[i+1] = v.y[2][-1]
+        x_ode[:,i+1] = v.y[:,-1]
+        x_prev = v.y[:,-1]
 
-        for j in range(3):
-            x_prev[j] = v.y[j][-1]
-
-    plt.plot(x_ode,y_ode,'-')
+    plt.plot(x_ode[0,:],x_ode[1,:],'-')
     plt.axis('equal')
 
     plt.show()
